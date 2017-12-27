@@ -24,7 +24,6 @@
 
 import random, time, argparse, sys
 import tempfile
-from pygame import mixer
 from sys import stdout
 
 LIMBS = ["arm", "leg"]
@@ -110,11 +109,13 @@ def main():
                 move = animate(WAIT)
             else:
                 move = get_move()
-            stdout.write("-= {} =-".format(move.upper()))
+            highlighted = "-= [{}] =-".format(move.upper())
+            stdout.write(highlighted)
             stdout.flush()
             if AUDIO:
                 play_move(move)
-            stdout.write("\r{}      \n".format(move.upper()))
+            stdout.write('\r{}\r'.format(' '*len(highlighted)))
+            print(move.upper())
             if not ANIMATE:
                 pause(delay=WAIT)
         except KeyboardInterrupt:
@@ -146,9 +147,10 @@ if __name__ == '__main__':
     if AUDIO:
         try:
             import gtts
+            from pygame import mixer
         except ImportError:
             AUDIO = False
             print("Cannot import audio utility.  Continuing without audio.")
-            print("To install, try: pip{} install --upgrade gTTS".format( \
+            print("To install, try: pip{} install --upgrade gTTS pygame".format( \
             '3' if sys.version_info > (3,0) else '2'))
     main()
