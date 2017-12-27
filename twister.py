@@ -110,9 +110,11 @@ def main():
                 move = animate(WAIT)
             else:
                 move = get_move()
-            print(move.upper())
+            stdout.write("-= {} =-".format(move.upper()))
+            stdout.flush()
             if AUDIO:
                 play_move(move)
+            stdout.write("\r{}      \n".format(move.upper()))
             if not ANIMATE:
                 pause(delay=WAIT)
         except KeyboardInterrupt:
