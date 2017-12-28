@@ -22,7 +22,7 @@
 #
 #
 
-import random, time, argparse, sys
+import random, time, argparse, sys, os
 import tempfile
 from sys import stdout
 
@@ -32,6 +32,8 @@ COLORS= ["red", "blue", "yellow", "green"]
 WAIT =  10
 AUDIO = True
 ANIMATE=False
+WIN    ='nt' in os.name
+LAST=None
 
 def _rand(data):
     index = random.randint(0,len(data)-1)
@@ -47,12 +49,25 @@ def get_move():
 def play_move(str_move):
     with tempfile.NamedTemporaryFile(mode='w') as f:
         a=gtts.gTTS(text=str_move, lang='en', slow=False)
+        if WIN:
+            f.delete=False
+            f.close()
         a.save(f.name)
         mixer.init()
         mixer.music.load(f.name)
         mixer.music.play()
-        while mixer.music.get_busy(): # pause this script until the
-            time.sleep(.1)              # audio finishes
+        try:
+            while mixer.music.get_busy(): # pause this script until the
+                time.sleep(.1)              # audio finishes
+        except KeyboardInterrupt:
+            mixer.quit()
+            os.remove(f.name)
+            raise
+        if WIN:
+            global LAST
+            if LAST is not None:
+                os.remove(LAST)
+            LAST = f.name
 
 def animate(delay=10):
     delay_width = len(str(delay))
@@ -102,26 +117,6 @@ def flash_move(move, rest=.05):
     stdout.write(' '*len(move))
     stdout.write('\r')
 
-def main():
-    while True:
-        try:
-            if ANIMATE:
-                move = animate(WAIT)
-            else:
-                move = get_move()
-            highlighted = "-= [{}] =-".format(move.upper())
-            stdout.write(highlighted)
-            stdout.flush()
-            if AUDIO:
-                play_move(move)
-            stdout.write('\r{}\r'.format(' '*len(highlighted)))
-            print(move.upper())
-            if not ANIMATE:
-                pause(delay=WAIT)
-        except KeyboardInterrupt:
-            exit(0)
-    return 0
-
 def parse_args():
     parser = argparse.ArgumentParser(
             description='Give twister commands every 10 seconds.')
@@ -141,6 +136,29 @@ def parse_args():
     if args.animate:
         global ANIMATE
         ANIMATE=True
+
+def main():
+    while True:
+        try:
+            if ANIMATE:
+                move = animate(WAIT)
+            else:
+                move = get_move()
+            highlighted = "-= [{}] =-".format(move.upper())
+            stdout.write(highlighted)
+            stdout.flush()
+            if AUDIO:
+                play_move(move)
+            stdout.write('\r{}\r'.format(' '*len(highlighted)))
+            print(move.upper())
+            if not ANIMATE:
+                pause(delay=WAIT)
+        except KeyboardInterrupt:
+            if WIN and LAST is not None:
+                mixer.quit()
+                os.remove(LAST)
+            exit(0)
+    return 0
 
 if __name__ == '__main__':
     args = parse_args()
