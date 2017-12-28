@@ -23,10 +23,17 @@ Give twister commands every 10 seconds.
 
 optional arguments:
   -h, --help            show this help message and exit
-  -s seconds, --wait seconds
+  -w seconds, --wait seconds
                         number of seconds between each command
   -n, --no-audio        only display commands to screen
+  -a, --animate         animate text version of spinning
+  -c, --countdown       animate text version of spinning
+  -l, --lift-up         add lift "up in the air" to wheel
+  -s [filename], --spinners-choice [filename]
+                        add spinners choice to wheel; import from filename
   
+Spinner's Choice is where a player can choose a special rule for that spin.  This program allows the user to come up with a list of idea's and load them from a file randomly.
+
 Example
 -------
 $ python3 twister
