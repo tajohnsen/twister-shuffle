@@ -22,6 +22,7 @@
 #
 #
 
+from spinners_choice import Choice
 import random, time, argparse, sys, os
 import tempfile
 from sys import stdout
@@ -29,10 +30,12 @@ from sys import stdout
 LIMBS   = ["arm", "leg"]
 SIDES   = ["right", "left"]
 COLORS  = ["red", "blue", "yellow", "green"]
+_COLORS = COLORS[:] # copy to maintain original colors (if user adds to wheel)
 WAIT    = 10
 AUDIO   = True
 ANIMATE = False
 COUNT   = False
+CHOICE  = False
 WIN     = 'nt' in os.name
 LAST    = None
 
@@ -146,10 +149,41 @@ def positive_int(value):
         raise argparse.ArgumentTypeError("{} is invalid (must be positive)".format(value))
     return ivalue
 
+def init_choice(filename=None):
+    """If using spinner's choices, """
+    global CHOICES; CHOICES = Choice()
+    if filename is not None:
+        CHOICES.load(filename)
+    global COLORS; COLORS.append('spinners choice')
+    #~ COLORS = ['spinners choice']
+
+def move_choice(move):
+    """Take a move that contains spinners choice and
+    return a spinners choice string."""
+    if 'spinners choice' in move:
+        move = move[0:move.find('spinners choice')] # cut off choice
+        move += _rand(_COLORS) # append random color
+    return CHOICES.get_move_str(move)
+
+def test_choices():
+    for choice in CHOICES.commands:
+        print(choice)
+        move = get_move()
+        #don't use move_choice to avoid random choice
+        if 'spinners choice' in move:
+            move = move[0:move.find('spinners choice')] # cut off choice
+            move += _rand(_COLORS) # append random color
+        if '{}' in choice:
+            move = choice.format(move)
+        else:
+            move = ' '.join([move,choice])
+        print(move)
+        play_move(move)
+
 def parse_args():
     parser = argparse.ArgumentParser(
             description='Give twister commands every 10 seconds.')
-    parser.add_argument('-s', '--wait', metavar='seconds', type=positive_int,
+    parser.add_argument('-w', '--wait', metavar='seconds', type=positive_int,
             help='number of seconds between each command')
     parser.add_argument('-n', '--no-audio', action='store_true',
             help='only display commands to screen')
@@ -157,11 +191,27 @@ def parse_args():
             help='animate text version of spinning')
     parser.add_argument('-c', '--countdown', action='store_true',
             help='animate text version of spinning')
+    parser.add_argument('-l', '--lift-up', action='store_true',
+            help='add lift "up in the air" to wheel')
+    parser.add_argument('-s', '--spinners-choice', action='store',
+            help='add spinners choice to wheel; import from filename',
+            const='', nargs="?", metavar='filename')
     args = parser.parse_args()
     if args.wait:
         global WAIT
         WAIT = args.wait
+    if args.spinners_choice is not None:
+        global CHOICE; CHOICE = True
+        chfile = None \
+            if args.spinners_choice == '' \
+                else args.spinners_choice
+        init_choice(filename=chfile)
+    if args.lift_up:
+        global COLORS; COLORS.append("up in the air")
 
+    #~ from pprint import pprint
+    #~ pprint(args)
+    #~ exit(0)
     global AUDIO; AUDIO=not args.no_audio
     global COUNT; COUNT = args.countdown
     global ANIMATE; ANIMATE=args.animate
@@ -173,6 +223,8 @@ def main():
                 move = animate(WAIT)
             else:
                 move = get_move()
+            if 'spinners choice' in move.lower():
+                move=move_choice(move)
             highlighted = "-= [{}] =-".format(move.upper())
             stdout.write(highlighted)
             stdout.flush()
@@ -180,6 +232,8 @@ def main():
                 play_move(move)
             stdout.write('\r{}\r'.format(' '*len(highlighted)))
             print(move.upper())
+            if 'spinner\'s choice' in move.lower():
+                pause() # delay 10 seconds since someone has to think
             if not ANIMATE:
                 pause(delay=WAIT)
         except KeyboardInterrupt:
@@ -196,6 +250,8 @@ if __name__ == '__main__':
         try:
             import gtts
             from pygame import mixer
+            #~ test_choices()
+            #~ exit(0)
         except ImportError:
             AUDIO = False
             print("Cannot import audio utility.  Continuing without audio.")
