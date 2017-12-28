@@ -36,11 +36,16 @@ COUNT   = False
 WIN     = 'nt' in os.name
 LAST    = None
 
-def _rand(data):
-    index = random.randint(0,len(data)-1)
-    return data[index]
+def _rand(list_data):
+    """Return a random element from a given list.
+    Will return None if the argument is not a list."""
+    if list_data is not list:
+        return None
+    index = random.randint(0,len(list_data)-1)
+    return list_data[index]
 
 def get_move():
+    """Return a randomly generated Twister move."""
     limb = _rand(LIMBS)
     side = _rand(SIDES)
     color= _rand(COLORS)
@@ -48,6 +53,8 @@ def get_move():
     return ' '.join([side,limb,color])
 
 def play_move(str_move):
+    """Taking an input str_move, save the text to speech, save it to a
+    temporary file, and play the audio."""
     with tempfile.NamedTemporaryFile(mode='w') as f:
         a=gtts.gTTS(text=str_move, lang='en', slow=False)
         if WIN:
@@ -72,6 +79,7 @@ def play_move(str_move):
             LAST = f.name
 
 def time_left_str(delay, duration):
+    """Return a formatted string of seconds left."""
     time_left = ''
     if COUNT:
         time_left += "[{delay:{width}d}] ".format(\
@@ -79,6 +87,7 @@ def time_left_str(delay, duration):
     return time_left
 
 def animate(delay=10):
+    """Display twister commands in order, emulating spinning a spinner."""
     increment = .25/delay
     rest = increment
     sides,limbs,colors=len(SIDES),len(LIMBS),len(COLORS)
@@ -106,6 +115,8 @@ def animate(delay=10):
     return move
 
 def pause(delay=10):
+    """Delay number of seconds passed in.  During the pause, display
+    other random moves to the screen for entertainment purposes."""
     delay_width = len(str(delay))
     start = time.time()
     duration = time.time() - start
@@ -116,6 +127,11 @@ def pause(delay=10):
         duration = time.time() - start
 
 def flash_move(move, rest=.05):
+    """Display a string passed in as an argument, rest for a certain
+    amount of time passed in as the rest argument, overwrite that
+    text with spaces (to erase) and then return.
+
+    Note:  Display buffer is not flushed after erasing message."""
     stdout.write(move)
     stdout.flush()
     time.sleep(rest)
@@ -124,6 +140,7 @@ def flash_move(move, rest=.05):
     stdout.write('\r')
 
 def positive_int(value):
+    """Ensure argument is a positive integer."""
     ivalue = int(value)
     if ivalue <= 0:
         raise argparse.ArgumentTypeError("{} is invalid (must be positive)".format(value))
