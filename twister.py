@@ -27,7 +27,7 @@ import random, time, argparse, sys, os
 import tempfile
 from sys import stdout
 
-LIMBS   = ["arm", "leg"]
+LIMBS   = ["hand", "foot"]
 SIDES   = ["right", "left"]
 COLORS  = ["red", "blue", "yellow", "green"]
 _COLORS = COLORS[:] # copy to maintain original colors (if user adds to wheel)
@@ -38,6 +38,7 @@ COUNT   = False
 CHOICE  = False
 WIN     = 'nt' in os.name
 LAST    = None
+ROUNDS  = 0 #count how many rounds the game lasted
 
 def _rand(list_data):
     """Return a random element from a given list.
@@ -217,6 +218,7 @@ def parse_args():
     global ANIMATE; ANIMATE=args.animate
 
 def main():
+    global ROUNDS
     while True:
         try:
             if ANIMATE:
@@ -236,11 +238,12 @@ def main():
                 pause() # delay 10 seconds since someone has to think
             if not ANIMATE:
                 pause(delay=WAIT)
+            ROUNDS += 1
         except KeyboardInterrupt:
             if WIN and LAST is not None:
                 mixer.quit()
                 os.remove(LAST)
-            stdout.write('\n')
+            print("\nGame lasted {} rounds!".format(ROUNDS))
             exit(0)
     return 0
 
