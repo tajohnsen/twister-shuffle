@@ -60,8 +60,9 @@ def play_move(str_move):
             while mixer.music.get_busy(): # pause this script until the
                 time.sleep(.1)              # audio finishes
         except KeyboardInterrupt:
-            mixer.quit()
-            os.remove(f.name)
+            if WIN: # if windows we need to delete the current file
+                mixer.quit() # quit to make file available to delete
+                os.remove(f.name)
             raise
         if WIN:
             global LAST
@@ -163,6 +164,7 @@ def main():
             if WIN and LAST is not None:
                 mixer.quit()
                 os.remove(LAST)
+            stdout.write('\n')
             exit(0)
     return 0
 
