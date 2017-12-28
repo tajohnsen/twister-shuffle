@@ -53,11 +53,11 @@ def play_move(str_move):
         if WIN:
             f.delete=False
             f.close()
-        a.save(f.name)
-        mixer.init()
-        mixer.music.load(f.name)
-        mixer.music.play()
-        try:
+        try: # we must catch here because of Windows (to delete file)
+            a.save(f.name)
+            mixer.init()
+            mixer.music.load(f.name)
+            mixer.music.play()
             while mixer.music.get_busy(): # pause this script until the
                 time.sleep(.1)              # audio finishes
         except KeyboardInterrupt:
