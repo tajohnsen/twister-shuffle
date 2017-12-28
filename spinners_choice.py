@@ -32,7 +32,8 @@ class Choice():
         try:
             with open(filename,'r') as f:
                 for line in f.readlines():
-                    self.commands.append(line.strip())
+                    if len(line.strip()) != 0:
+                        self.commands.append(line.strip())
         except:
             print("Cannot open {}!".format(filename))
 
