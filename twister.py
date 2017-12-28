@@ -32,6 +32,7 @@ COLORS  = ["red", "blue", "yellow", "green"]
 WAIT    = 10
 AUDIO   = True
 ANIMATE = False
+COUNT   = False
 WIN     = 'nt' in os.name
 LAST    = None
 
@@ -70,9 +71,15 @@ def play_move(str_move):
                 os.remove(LAST)
             LAST = f.name
 
+def time_left_str(delay, duration):
+    time_left = ''
+    if COUNT:
+        time_left += "[{delay:{width}d}] ".format(\
+            delay=int(delay-duration)+1, width=len(str(delay)))
+    return time_left
+
 def animate(delay=10):
-    delay_width = len(str(delay))
-    increment = .1/delay
+    increment = .25/delay
     rest = increment
     sides,limbs,colors=len(SIDES),len(LIMBS),len(COLORS)
     side = random.randint(0,sides-1)
@@ -90,14 +97,13 @@ def animate(delay=10):
             if y == side:
                 x+=1
                 x%=limbs
-        time_left = "[{delay:{width}d}] ".format(\
-            delay=int(delay-duration)+1, width=delay_width)
+        time_left = time_left_str(delay, duration)
         move = ' '.join([SIDES[y],LIMBS[x],COLORS[z]])
         flash_move(time_left + move,rest)
-        rest+=increment
         duration = time.time() - start
+        if duration > delay/2.0: # go quick for the first half
+            rest+=increment
     return move
-
 
 def pause(delay=10):
     delay_width = len(str(delay))
@@ -105,8 +111,7 @@ def pause(delay=10):
     duration = time.time() - start
     while duration < delay:
         move = get_move()
-        time_left = "[{delay:{width}d}] ".format(\
-            delay=int(delay-duration)+1, width=delay_width)
+        time_left = time_left_str(delay, duration)
         flash_move(time_left + move)
         duration = time.time() - start
 
@@ -133,16 +138,16 @@ def parse_args():
             help='only display commands to screen')
     parser.add_argument('-a', '--animate', action='store_true',
             help='animate text version of spinning')
+    parser.add_argument('-c', '--countdown', action='store_true',
+            help='animate text version of spinning')
     args = parser.parse_args()
     if args.wait:
         global WAIT
         WAIT = args.wait
-    if args.no_audio:
-        global AUDIO
-        AUDIO=False
-    if args.animate:
-        global ANIMATE
-        ANIMATE=True
+
+    global AUDIO; AUDIO=not args.no_audio
+    global COUNT; COUNT = args.countdown
+    global ANIMATE; ANIMATE=args.animate
 
 def main():
     while True:
