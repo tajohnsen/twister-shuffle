@@ -26,14 +26,14 @@ import random, time, argparse, sys, os
 import tempfile
 from sys import stdout
 
-LIMBS = ["arm", "leg"]
-SIDES = ["right", "left"]
-COLORS= ["red", "blue", "yellow", "green"]
-WAIT =  10
-AUDIO = True
-ANIMATE=False
-WIN    ='nt' in os.name
-LAST=None
+LIMBS   = ["arm", "leg"]
+SIDES   = ["right", "left"]
+COLORS  = ["red", "blue", "yellow", "green"]
+WAIT    = 10
+AUDIO   = True
+ANIMATE = False
+WIN     = 'nt' in os.name
+LAST    = None
 
 def _rand(data):
     index = random.randint(0,len(data)-1)
@@ -117,10 +117,16 @@ def flash_move(move, rest=.05):
     stdout.write(' '*len(move))
     stdout.write('\r')
 
+def positive_int(value):
+    ivalue = int(value)
+    if ivalue <= 0:
+        raise argparse.ArgumentTypeError("{} is invalid (must be positive)".format(value))
+    return ivalue
+
 def parse_args():
     parser = argparse.ArgumentParser(
             description='Give twister commands every 10 seconds.')
-    parser.add_argument('-s', '--wait', metavar='seconds', type=int,
+    parser.add_argument('-s', '--wait', metavar='seconds', type=positive_int,
             help='number of seconds between each command')
     parser.add_argument('-n', '--no-audio', action='store_true',
             help='only display commands to screen')
