@@ -39,7 +39,7 @@ LAST    = None
 def _rand(list_data):
     """Return a random element from a given list.
     Will return None if the argument is not a list."""
-    if list_data is not list:
+    if type(list_data) is not list:
         return None
     index = random.randint(0,len(list_data)-1)
     return list_data[index]
