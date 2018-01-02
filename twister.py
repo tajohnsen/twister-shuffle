@@ -95,7 +95,7 @@ def play_move_stored(str_move, download=True):
             #~ print("playing stored file: {}".format(file_name))
             play_file(file_name)
         except KeyboardInterrupt:
-            pass # do nothing since we aren't deleting here
+            raise # just reraise since we aren't deleting here
     elif download:
         #~ print("downloading file")
         # if file isn't there download it
@@ -235,6 +235,8 @@ def parse_args():
             help='animate text version of spinning')
     parser.add_argument('-l', '--lift-up', action='store_true',
             help='add lift "up in the air" to wheel')
+    parser.add_argument('-d', '--no-download', action='store_true',
+            help="don't perform the initial download of audio files")
     parser.add_argument('-s', '--spinners-choice', action='store',
             help='add spinners choice to wheel; import from filename',
             const='', nargs="?", metavar='filename')
@@ -257,6 +259,7 @@ def parse_args():
     global AUDIO; AUDIO=not args.no_audio
     global COUNT; COUNT = args.countdown
     global ANIMATE; ANIMATE=args.animate
+    return args
 
 def main():
     while True:
@@ -273,7 +276,7 @@ def main():
             if AUDIO:
                 # don't download if using choice because there are
                 # too many large options
-                play_move_stored(move, download=not Choice)
+                play_move_stored(move, download=not CHOICE)
             stdout.write('\r{}\r'.format(' '*len(highlighted)))
             print(move.upper())
             if 'spinner\'s choice' in move.lower():
@@ -294,9 +297,17 @@ if __name__ == '__main__':
         try:
             import gtts
             from pygame import mixer
-            download_moves()
+            if not args.no_download: # if user didn't skip download
+                download_moves()
             #~ test_choices()
             #~ exit(0)
+        except KeyboardInterrupt:
+            # can interrupt the download of audio files
+            # exit with error
+            print("\nInterrupted download of audio files.")
+            print("If there is a problem with the download use --no-audio")
+            print("or use --no-download to skip the initial download.")
+            exit(1)
         except ImportError:
             AUDIO = False
             print("Cannot import audio utility.  Continuing without audio.")
