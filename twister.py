@@ -27,7 +27,7 @@ import random, time, argparse, sys, os
 import tempfile
 from sys import stdout
 
-LIMBS   = ["arm", "leg"]
+LIMBS   = ["hand", "foot"]
 SIDES   = ["right", "left"]
 COLORS  = ["red", "blue", "yellow", "green"]
 _COLORS = COLORS[:] # copy to maintain original colors (if user adds to wheel)
@@ -59,20 +59,14 @@ def play_move(str_move):
     """Taking an input str_move, save the text to speech, save it to a
     temporary file, and play the audio."""
     with tempfile.NamedTemporaryFile(mode='w') as f:
-        a=gtts.gTTS(text=str_move, lang='en', slow=False)
         if WIN:
             f.delete=False
             f.close()
         try: # we must catch here because of Windows (to delete file)
-            a.save(f.name)
-            mixer.init()
-            mixer.music.load(f.name)
-            mixer.music.play()
-            while mixer.music.get_busy(): # pause this script until the
-                time.sleep(.1)              # audio finishes
+            save_sound_file(str_move, f.name)
+            play_file(f.name)
         except KeyboardInterrupt:
             if WIN: # if windows we need to delete the current file
-                mixer.quit() # quit to make file available to delete
                 os.remove(f.name)
             raise
         if WIN:
@@ -80,6 +74,54 @@ def play_move(str_move):
             if LAST is not None:
                 os.remove(LAST)
             LAST = f.name
+
+def play_file(file_name):
+    """Use pygame...music.play to play file_name"""
+    from pygame import mixer
+    try:
+        mixer.init()
+        mixer.music.load(file_name)
+        mixer.music.play()
+        while mixer.music.get_busy(): # pause this script until the
+            time.sleep(.01)              # audio finishes
+    except KeyboardInterrupt:
+        mixer.quit() # quit to make file available to delete
+        raise # re-raise for caller to handle rest of delete (possibly)
+
+def play_move_stored(str_move, download=True):
+    file_name = "audio/{}.mp3".format(str_move.replace(' ','_'))
+    if os.path.exists(file_name):
+        try:
+            #~ print("playing stored file: {}".format(file_name))
+            play_file(file_name)
+        except KeyboardInterrupt:
+            pass # do nothing since we aren't deleting here
+    elif download:
+        #~ print("downloading file")
+        # if file isn't there download it
+        save_sound_file(str_move, 'audio/{}.mp3'.format(str_move.replace(' ','_')))
+        play_move_stored(str_move, download=False) # recursive call
+    else:
+        #~ print("not saving downloaded mp3")
+        play_move(str_move) # if download isn't set, use tempfile
+
+def save_sound_file(text, destination):
+    """Save text string as an MP3 to destination."""
+    import gtts
+    tts=gtts.gTTS(text=text, lang='en', slow=False)
+    tts.save(destination)
+
+def download_moves():
+    """Download all mp3 files for basic moves."""
+    if not os.path.isdir('audio') and not os.path.exists('audio'):
+        os.mkdir('audio')
+    for side in SIDES:
+        for limb in LIMBS:
+            for color in COLORS:
+                str_move = ' '.join([side,limb,color])
+                file_name = 'audio/{}.mp3'.format(str_move.replace(' ','_'))
+                if not os.path.exists(file_name):
+                    save_sound_file(str_move, file_name)
 
 def time_left_str(delay, duration):
     """Return a formatted string of seconds left."""
@@ -229,7 +271,9 @@ def main():
             stdout.write(highlighted)
             stdout.flush()
             if AUDIO:
-                play_move(move)
+                # don't download if using choice because there are
+                # too many large options
+                play_move_stored(move, download=not Choice)
             stdout.write('\r{}\r'.format(' '*len(highlighted)))
             print(move.upper())
             if 'spinner\'s choice' in move.lower():
@@ -250,6 +294,7 @@ if __name__ == '__main__':
         try:
             import gtts
             from pygame import mixer
+            download_moves()
             #~ test_choices()
             #~ exit(0)
         except ImportError:
