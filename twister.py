@@ -23,7 +23,7 @@
 #
 
 from spinners_choice import Choice
-import random, time, argparse, sys, os
+import random, time, argparse, sys, os, atexit
 import tempfile
 from sys import stdout
 
@@ -61,6 +61,11 @@ def play_move(str_move):
     with tempfile.NamedTemporaryFile(mode='w') as f:
         a=gtts.gTTS(text=str_move, lang='en', slow=False)
         if WIN:
+            global LAST
+            if LAST is None:
+                LAST=[f.name]
+            else:
+                LAST.append(f.name)
             f.delete=False
             f.close()
         try: # we must catch here because of Windows (to delete file)
@@ -75,11 +80,9 @@ def play_move(str_move):
                 mixer.quit() # quit to make file available to delete
                 os.remove(f.name)
             raise
-        if WIN:
-            global LAST
-            if LAST is not None:
-                os.remove(LAST)
-            LAST = f.name
+        if WIN and len(LAST) == 2:
+            os.remove(LAST[0])
+            LAST.remove(LAST[0])
 
 def time_left_str(delay, duration):
     """Return a formatted string of seconds left."""
@@ -216,6 +219,15 @@ def parse_args():
     global COUNT; COUNT = args.countdown
     global ANIMATE; ANIMATE=args.animate
 
+def at_exit():
+    if WIN and LAST is not None:
+        mixer.quit()
+        for file in LAST:
+            try:
+                os.remove(file)
+            except:
+                continue # if remove fails move on to next`
+
 def main():
     while True:
         try:
@@ -237,9 +249,6 @@ def main():
             if not ANIMATE:
                 pause(delay=WAIT)
         except KeyboardInterrupt:
-            if WIN and LAST is not None:
-                mixer.quit()
-                os.remove(LAST)
             stdout.write('\n')
             exit(0)
     return 0
@@ -250,6 +259,7 @@ if __name__ == '__main__':
         try:
             import gtts
             from pygame import mixer
+            atexit.register(at_exit)
             #~ test_choices()
             #~ exit(0)
         except ImportError:
