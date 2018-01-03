@@ -65,7 +65,7 @@ class Choice():
         If a {} is NOT in the custom line, return move, choice
         If a {} IS in the custom line, return move.formated, None"""
         if len(self.commands) == 0:
-            return move, '; and spinner\'s choice'  # return as is, we can't do anything here
+            return move, 'and spinner\'s choice'  # return as is, we can't do anything here
         choice = self.get_random_str()
         if '{}' not in choice:
             return move.strip(), choice.strip()
