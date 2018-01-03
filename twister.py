@@ -27,7 +27,7 @@ import random, time, argparse, sys, os, atexit
 import tempfile
 from sys import stdout
 
-LIMBS   = ["arm", "leg"]
+LIMBS   = ["hand", "foot"]
 SIDES   = ["right", "left"]
 COLORS  = ["red", "blue", "yellow", "green"]
 _COLORS = COLORS[:] # copy to maintain original colors (if user adds to wheel)
@@ -38,6 +38,7 @@ COUNT   = False
 CHOICE  = False
 WIN     = 'nt' in os.name
 LAST    = None
+ROUNDS  = 0 #count how many rounds the game lasted
 
 def _rand(list_data):
     """Return a random element from a given list.
@@ -55,11 +56,26 @@ def get_move():
 
     return ' '.join([side,limb,color])
 
+def play_file(file_name):
+    """Use pygame...music.play to play file_name"""
+    from pygame import mixer, error # done again in case used as library
+    try:
+        mixer.init()
+        mixer.music.load(file_name)
+        mixer.music.play()
+        while mixer.music.get_busy(): # pause this script until the
+            time.sleep(.01)              # audio finishes
+    except KeyboardInterrupt:
+        mixer.quit() # quit to make file available to delete
+        raise # re-raise for caller to handle rest of delete (possibly)
+    except error: # pygame.error
+        print("Error loading {}! File has been removed!".format(file_name))
+        os.remove(file_name)
+
 def play_move(str_move):
     """Taking an input str_move, save the text to speech, save it to a
     temporary file, and play the audio."""
     with tempfile.NamedTemporaryFile(mode='w') as f:
-        a=gtts.gTTS(text=str_move, lang='en', slow=False)
         if WIN:
             global LAST
             if LAST is None:
@@ -69,20 +85,95 @@ def play_move(str_move):
             f.delete=False
             f.close()
         try: # we must catch here because of Windows (to delete file)
-            a.save(f.name)
-            mixer.init()
-            mixer.music.load(f.name)
-            mixer.music.play()
-            while mixer.music.get_busy(): # pause this script until the
-                time.sleep(.1)              # audio finishes
+            save_sound_file(str_move, f.name)
+            play_file(f.name)
         except KeyboardInterrupt:
             if WIN: # if windows we need to delete the current file
-                mixer.quit() # quit to make file available to delete
                 os.remove(f.name)
             raise
         if WIN and len(LAST) == 2:
             os.remove(LAST[0])
             LAST.remove(LAST[0])
+
+def play_move_stored(str_move, download=True):
+    file_name = "audio/{}.mp3".format(str_move.replace(' ','_'))
+    if os.path.exists(file_name):
+        try:
+            #~ print("playing stored file: {}".format(file_name))
+            play_file(file_name)
+        except KeyboardInterrupt:
+            raise # just reraise since we aren't deleting here
+    elif download:
+        #~ print("downloading file")
+        # if file isn't there download it
+        if not os.path.isdir('audio'):
+            os.mkdir('audio')
+        save_sound_file(str_move, 'audio/{}.mp3'.format(str_move.replace(' ','_')))
+        play_move_stored(str_move, download=False) # recursive call but don't reattempt download
+    else:
+        #~ print("not saving downloaded mp3")
+        play_move(str_move) # if download isn't set, use tempfile
+
+def save_sound_file(text, destination):
+    """Save text string as an MP3 to destination."""
+    import gtts
+    try:
+        tts=gtts.gTTS(text=text, lang='en', slow=False)
+        tts.save(destination)
+    except KeyboardInterrupt:
+        # if the download was interrupted erase it because it's probably bad
+        if os.path.exists(destination):
+            os.remove(destination)
+            raise
+
+def download_moves():
+    """Download all mp3 files for basic moves."""
+    download_message = "Performing initial download..."
+    sys.stdout.write(download_message)
+    sys.stdout.flush()
+    current = 0
+    total = len(SIDES) * len(LIMBS) * len(COLORS)
+    total += 0 if not CHOICE else CHOICES.len
+    display = "{}/{}"
+    display_last = display.format(current,total)
+    sys.stdout.write(display_last); sys.stdout.flush()
+    if not os.path.isdir('audio') and not os.path.exists('audio'):
+        os.mkdir('audio')
+    for side in SIDES:
+        for limb in LIMBS:
+            for color in COLORS:
+                if 'spinners choice' == color:
+                    for _color in _COLORS:
+                        str_move = ' '.join([side,limb,_color,'and',color])
+                        file_name = 'audio/{}.mp3'.format(str_move.replace(' ','_'))
+                        if not os.path.exists(file_name):
+                            save_sound_file(str_move, file_name)
+                else:
+                    str_move = ' '.join([side,limb,color])
+                    file_name = 'audio/{}.mp3'.format(str_move.replace(' ','_'))
+                    if not os.path.exists(file_name):
+                        save_sound_file(str_move, file_name)
+                current += 1
+                sys.stdout.write('\b'*len(display_last)) #backspace over last display
+                display_last = display.format(current,total)
+                sys.stdout.write(display.format(current,total))
+                sys.stdout.flush()
+    if CHOICE:
+        for index in range(CHOICES.len):
+            str_move = CHOICES.get(index)
+            if '{}' not in str_move: # skip downloading formatted types
+                file_name = 'audio/{}.mp3'.format(str_move.replace(' ','_'))
+                if not os.path.exists(file_name):
+                    save_sound_file(str_move, file_name)
+            current += 1
+            sys.stdout.write('\b'*len(display_last)) #backspace over last display
+            display_last = display.format(current,total)
+            sys.stdout.write(display.format(current,total))
+            sys.stdout.flush()
+
+    sys.stdout.write('\r')
+    sys.stdout.write(' '* (len(download_message) + len(display_last)))
+    sys.stdout.write('\r')
 
 def time_left_str(delay, duration):
     """Return a formatted string of seconds left."""
@@ -186,6 +277,8 @@ def test_choices():
 def parse_args():
     parser = argparse.ArgumentParser(
             description='Give twister commands every 10 seconds.')
+    #parser.add_argument('--clean', action='store_true',
+    #        help='erase downloaded files and exit')
     parser.add_argument('-w', '--wait', metavar='seconds', type=positive_int,
             help='number of seconds between each command')
     parser.add_argument('-n', '--no-audio', action='store_true',
@@ -196,10 +289,15 @@ def parse_args():
             help='animate text version of spinning')
     parser.add_argument('-l', '--lift-up', action='store_true',
             help='add lift "up in the air" to wheel')
+    parser.add_argument('-d', '--no-download', action='store_true',
+            help="don't perform the initial download of audio files")
     parser.add_argument('-s', '--spinners-choice', action='store',
             help='add spinners choice to wheel; import from filename',
             const='', nargs="?", metavar='filename')
     args = parser.parse_args()
+    #if args.clean:
+    #    pass
+    #    exit(0)
     if args.wait:
         global WAIT
         WAIT = args.wait
@@ -218,6 +316,7 @@ def parse_args():
     global AUDIO; AUDIO=not args.no_audio
     global COUNT; COUNT = args.countdown
     global ANIMATE; ANIMATE=args.animate
+    return args
 
 def at_exit():
     if WIN and LAST is not None:
@@ -229,27 +328,41 @@ def at_exit():
                 continue # if remove fails move on to next`
 
 def main():
+    global ROUNDS
     while True:
         try:
             if ANIMATE:
                 move = animate(WAIT)
             else:
                 move = get_move()
-            if 'spinners choice' in move.lower():
-                move=move_choice(move)
-            highlighted = "-= [{}] =-".format(move.upper())
+            SC = 'spinners choice' in move.lower()
+            if SC:
+                move,choice=move_choice(move)
+                if choice is None:
+                    SC = False # treat as regular if formatted
+                else:
+                    move_combined = ' '.join([move,choice])
+            if not SC: # not else to pick up on change above
+                move_combined = move
+            highlighted = "-= [{}] =-".format(move_combined.upper())
             stdout.write(highlighted)
             stdout.flush()
             if AUDIO:
-                play_move(move)
+                play_move_stored(move)
+                if SC:
+                    play_move_stored(choice)
             stdout.write('\r{}\r'.format(' '*len(highlighted)))
-            print(move.upper())
-            if 'spinner\'s choice' in move.lower():
+            print(move_combined.upper())
+            if 'spinner\'s choice' in move_combined.lower():
                 pause() # delay 10 seconds since someone has to think
             if not ANIMATE:
                 pause(delay=WAIT)
+            ROUNDS += 1
         except KeyboardInterrupt:
-            stdout.write('\n')
+            if WIN and LAST is not None:
+                mixer.quit()
+                os.remove(LAST)
+            print("\nGame lasted {} rounds!".format(ROUNDS))
             exit(0)
     return 0
 
@@ -260,8 +373,17 @@ if __name__ == '__main__':
             import gtts
             from pygame import mixer
             atexit.register(at_exit)
+            if not args.no_download: # if user didn't skip download
+                download_moves()
             #~ test_choices()
             #~ exit(0)
+        except KeyboardInterrupt:
+            # can interrupt the download of audio files
+            # exit with error
+            print("\nInterrupted download of audio files.")
+            print("If there is a problem with the download use --no-audio to not use the audio feature.")
+            print("Use --no-download to skip the initial download. (will download per first use)")
+            exit(1)
         except ImportError:
             AUDIO = False
             print("Cannot import audio utility.  Continuing without audio.")
