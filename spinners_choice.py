@@ -33,9 +33,11 @@ class Choice():
         try:
             with open(filename,'r') as f:
                 for line in f.readlines():
+                    line=line.strip()
+                    if len(line) == 0:
+                        continue # don't include this line if it's blank
                     if '#' in line: # allow comments, removing them
                         line = line.split('#',1)[0]
-                    line=line.strip()
                     if '{}' not in line:
                         if line.lower()[0:4] != "and ": # if it doesn't start with and, add 'and'
                             line = 'and ' + line.strip()
