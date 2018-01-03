@@ -55,6 +55,22 @@ def get_move():
 
     return ' '.join([side,limb,color])
 
+def play_file(file_name):
+    """Use pygame...music.play to play file_name"""
+    from pygame import mixer, error # done again in case used as library
+    try:
+        mixer.init()
+        mixer.music.load(file_name)
+        mixer.music.play()
+        while mixer.music.get_busy(): # pause this script until the
+            time.sleep(.01)              # audio finishes
+    except KeyboardInterrupt:
+        mixer.quit() # quit to make file available to delete
+        raise # re-raise for caller to handle rest of delete (possibly)
+    except error: # pygame.error
+        print("Error loading {}! File has been removed!".format(file_name))
+        os.remove(file_name)
+    
 def play_move(str_move):
     """Taking an input str_move, save the text to speech, save it to a
     temporary file, and play the audio."""
@@ -75,19 +91,6 @@ def play_move(str_move):
                 os.remove(LAST)
             LAST = f.name
 
-def play_file(file_name):
-    """Use pygame...music.play to play file_name"""
-    from pygame import mixer
-    try:
-        mixer.init()
-        mixer.music.load(file_name)
-        mixer.music.play()
-        while mixer.music.get_busy(): # pause this script until the
-            time.sleep(.01)              # audio finishes
-    except KeyboardInterrupt:
-        mixer.quit() # quit to make file available to delete
-        raise # re-raise for caller to handle rest of delete (possibly)
-
 def play_move_stored(str_move, download=True):
     file_name = "audio/{}.mp3".format(str_move.replace(' ','_'))
     if os.path.exists(file_name):
@@ -99,8 +102,10 @@ def play_move_stored(str_move, download=True):
     elif download:
         #~ print("downloading file")
         # if file isn't there download it
+        if not os.path.isdir('audio'):
+            os.mkdir('audio')
         save_sound_file(str_move, 'audio/{}.mp3'.format(str_move.replace(' ','_')))
-        play_move_stored(str_move, download=False) # recursive call
+        play_move_stored(str_move, download=False) # recursive call but don't reattempt download
     else:
         #~ print("not saving downloaded mp3")
         play_move(str_move) # if download isn't set, use tempfile
@@ -108,20 +113,63 @@ def play_move_stored(str_move, download=True):
 def save_sound_file(text, destination):
     """Save text string as an MP3 to destination."""
     import gtts
-    tts=gtts.gTTS(text=text, lang='en', slow=False)
-    tts.save(destination)
-
+    try:
+        tts=gtts.gTTS(text=text, lang='en', slow=False)
+        tts.save(destination)
+    except KeyboardInterrupt:
+        # if the download was interrupted erase it because it's probably bad
+        if os.path.exists(destination):
+            os.remove(destination)
+            raise
+            
 def download_moves():
     """Download all mp3 files for basic moves."""
+    download_message = "Performing initial download..."
+    sys.stdout.write(download_message)
+    sys.stdout.flush()
+    current = 0
+    total = len(SIDES) * len(LIMBS) * len(COLORS)
+    total += 0 if not CHOICE else CHOICES.len 
+    display = "{}/{}"
+    display_last = display.format(current,total)
+    sys.stdout.write(display_last); sys.stdout.flush()
     if not os.path.isdir('audio') and not os.path.exists('audio'):
         os.mkdir('audio')
     for side in SIDES:
         for limb in LIMBS:
             for color in COLORS:
-                str_move = ' '.join([side,limb,color])
+                if 'spinners choice' == color:
+                    for _color in _COLORS:
+                        str_move = ' '.join([side,limb,_color,'and',color])
+                        file_name = 'audio/{}.mp3'.format(str_move.replace(' ','_'))
+                        if not os.path.exists(file_name):
+                            save_sound_file(str_move, file_name)
+                else:
+                    str_move = ' '.join([side,limb,color])
+                    file_name = 'audio/{}.mp3'.format(str_move.replace(' ','_'))
+                    if not os.path.exists(file_name):
+                        save_sound_file(str_move, file_name)
+                current += 1
+                sys.stdout.write('\b'*len(display_last)) #backspace over last display
+                display_last = display.format(current,total)
+                sys.stdout.write(display.format(current,total))
+                sys.stdout.flush()
+    if CHOICE:
+        for index in range(CHOICES.len):
+            str_move = CHOICES.get(index)
+            if '{}' not in str_move: # skip downloading formatted types
                 file_name = 'audio/{}.mp3'.format(str_move.replace(' ','_'))
                 if not os.path.exists(file_name):
                     save_sound_file(str_move, file_name)
+            current += 1
+            sys.stdout.write('\b'*len(display_last)) #backspace over last display
+            display_last = display.format(current,total)
+            sys.stdout.write(display.format(current,total))
+            sys.stdout.flush()
+
+    sys.stdout.write('\r')
+    sys.stdout.write(' '* (len(download_message) + len(display_last)))
+    sys.stdout.write('\r')
 
 def time_left_str(delay, duration):
     """Return a formatted string of seconds left."""
@@ -225,6 +273,8 @@ def test_choices():
 def parse_args():
     parser = argparse.ArgumentParser(
             description='Give twister commands every 10 seconds.')
+    #parser.add_argument('--clean', action='store_true',
+    #        help='erase downloaded files and exit')
     parser.add_argument('-w', '--wait', metavar='seconds', type=positive_int,
             help='number of seconds between each command')
     parser.add_argument('-n', '--no-audio', action='store_true',
@@ -241,6 +291,9 @@ def parse_args():
             help='add spinners choice to wheel; import from filename',
             const='', nargs="?", metavar='filename')
     args = parser.parse_args()
+    #if args.clean:
+    #    pass
+    #    exit(0)
     if args.wait:
         global WAIT
         WAIT = args.wait
@@ -268,18 +321,25 @@ def main():
                 move = animate(WAIT)
             else:
                 move = get_move()
-            if 'spinners choice' in move.lower():
-                move=move_choice(move)
-            highlighted = "-= [{}] =-".format(move.upper())
+            SC = 'spinners choice' in move.lower()
+            if SC:
+                move,choice=move_choice(move)
+                if choice is None:
+                    SC = False # treat as regular if formatted
+                else:
+                    move_combined = ' '.join([move,choice])
+            if not SC: # not else to pick up on change above
+                move_combined = move
+            highlighted = "-= [{}] =-".format(move_combined.upper())
             stdout.write(highlighted)
             stdout.flush()
             if AUDIO:
-                # don't download if using choice because there are
-                # too many large options
-                play_move_stored(move, download=not CHOICE)
+                play_move_stored(move)
+                if SC:
+                    play_move_stored(choice)
             stdout.write('\r{}\r'.format(' '*len(highlighted)))
-            print(move.upper())
-            if 'spinner\'s choice' in move.lower():
+            print(move_combined.upper())
+            if 'spinner\'s choice' in move_combined.lower():
                 pause() # delay 10 seconds since someone has to think
             if not ANIMATE:
                 pause(delay=WAIT)
@@ -305,8 +365,8 @@ if __name__ == '__main__':
             # can interrupt the download of audio files
             # exit with error
             print("\nInterrupted download of audio files.")
-            print("If there is a problem with the download use --no-audio")
-            print("or use --no-download to skip the initial download.")
+            print("If there is a problem with the download use --no-audio to not use the audio feature.")
+            print("Use --no-download to skip the initial download. (will download per first use)")
             exit(1)
         except ImportError:
             AUDIO = False

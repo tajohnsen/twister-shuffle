@@ -26,15 +26,23 @@ import random
 class Choice():
     def __init__(self):
         self.commands = []
+        self.len = 0    # initialize with 0 elements
 
     def load(self, filename):
         """Load commands from file."""
         try:
             with open(filename,'r') as f:
                 for line in f.readlines():
-                    self.commands.append(line.strip())
+                    if '#' in line: # allow comments, removing them
+                        line = line.split('#',1)[0]
+                    line=line.strip()
+                    if '{}' not in line:
+                        if line.lower()[0:4] != "and ": # if it doesn't start with and, add 'and'
+                            line = 'and ' + line.strip()
+                    self.commands.append(line)
         except:
             print("Cannot open {}!".format(filename))
+        self.len = len(self.commands)
 
     def get_random_str(self):
         size = len(self.commands)
@@ -51,13 +59,13 @@ class Choice():
 
     def get_move_str(self,move):
         """Return a given Twister move with a random choice.
-        If the randomly selected move doesn't have a {}, add it."""
+        Without a custom file it will return move, ' and spinners choice'
+        If a {} is NOT in the custom line, return move, choice
+        If a {} IS in the custom line, return move.formated, None"""
         if len(self.commands) == 0:
-            return move + '. and spinner\'s choice'  # return as is, we can't do anything here
+            return move, ', and spinner\'s choice'  # return as is, we can't do anything here
         choice = self.get_random_str()
         if '{}' not in choice:
-            if choice.lstrip().lower()[0:3] != "and":
-                choice = 'and ' + choice.strip()
-            return ' '.join([move.strip(), choice.strip()])
+            return move.strip(), choice.strip()
         else:
-            return choice.format(move)
+            return choice.format(move), None
