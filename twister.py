@@ -134,8 +134,8 @@ def download_moves():
     current = 0
     total = len(SIDES) * len(LIMBS) * len(COLORS)
     total += 0 if not CHOICE else CHOICES.len
-    display = "{}/{}"
-    display_last = display.format(current,total)
+    display = "{}%"
+    display_last = display.format(int((current*100)/total))
     sys.stdout.write(display_last); sys.stdout.flush()
     if not os.path.isdir('audio') and not os.path.exists('audio'):
         os.mkdir('audio')
@@ -155,8 +155,8 @@ def download_moves():
                         save_sound_file(str_move, file_name)
                 current += 1
                 sys.stdout.write('\b'*len(display_last)) #backspace over last display
-                display_last = display.format(current,total)
-                sys.stdout.write(display.format(current,total))
+                display_last = display.format(int((current*100)/total))
+                sys.stdout.write(display_last)
                 sys.stdout.flush()
     if CHOICE:
         for index in range(CHOICES.len):
@@ -167,8 +167,8 @@ def download_moves():
                     save_sound_file(str_move, file_name)
             current += 1
             sys.stdout.write('\b'*len(display_last)) #backspace over last display
-            display_last = display.format(current,total)
-            sys.stdout.write(display.format(current,total))
+            display_last = display.format(int((current*100)/total))
+            sys.stdout.write(display_last)
             sys.stdout.flush()
 
     sys.stdout.write('\r')
