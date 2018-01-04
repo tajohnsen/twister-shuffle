@@ -56,6 +56,20 @@ def get_move():
 
     return ' '.join([side,limb,color])
 
+def safe_delete(file_name):
+    """Check if a file exists, if it does delete it."""
+    if type(file_name) is str and os.path.exists(file_name):
+        try:
+            os.remove(file_name)
+        except OSError:
+            print("Error deleting, will try again on exit!")
+            def del_on_exit():
+                try:
+                    os.remove(file_name)
+                except:
+                    print("Cannot delete {}! Try to manually erase this corrupted file.".format(file_name))
+            atexit.register(del_on_exit)
+
 def play_file(file_name):
     """Use pygame...music.play to play file_name"""
     from pygame import mixer, error # done again in case used as library
@@ -69,15 +83,16 @@ def play_file(file_name):
         mixer.quit() # quit to make file available to delete
         raise # re-raise for caller to handle rest of delete (possibly)
     except error: # pygame.error
-        print("Error loading {}! File has been removed!".format(file_name))
-        os.remove(file_name)
+        print("Error loading {}! File will be removed!".format(file_name))
+        mixer.quit()
+        safe_delete(file_name)
 
 def play_move(str_move):
     """Taking an input str_move, save the text to speech, save it to a
     temporary file, and play the audio."""
     with tempfile.NamedTemporaryFile(mode='w') as f:
         if WIN:
-            global LAST
+            global LAST # track last file opened in windows
             if LAST is None:
                 LAST=[f.name]
             else:
@@ -89,10 +104,12 @@ def play_move(str_move):
             play_file(f.name)
         except KeyboardInterrupt:
             if WIN: # if windows we need to delete the current file
-                os.remove(f.name)
+                safe_delete(f.name)
             raise
+        except: # download error, probably
+            pass
         if WIN and len(LAST) == 2:
-            os.remove(LAST[0])
+            safe_delete(LAST[0])
             LAST.remove(LAST[0])
 
 def play_move_stored(str_move, download=True):
@@ -108,7 +125,10 @@ def play_move_stored(str_move, download=True):
         # if file isn't there download it
         if not os.path.isdir('audio'):
             os.mkdir('audio')
-        save_sound_file(str_move, 'audio/{}.mp3'.format(str_move.replace(' ','_')))
+        try:
+            save_sound_file(str_move, file_name)
+        except: # download error
+            safe_delete(file_name)
         play_move_stored(str_move, download=False) # recursive call but don't reattempt download
     else:
         #~ print("not saving downloaded mp3")
@@ -122,9 +142,11 @@ def save_sound_file(text, destination):
         tts.save(destination)
     except KeyboardInterrupt:
         # if the download was interrupted erase it because it's probably bad
-        if os.path.exists(destination):
-            os.remove(destination)
-            raise
+        safe_delete(destination)
+        raise
+    except: # any other, most likely connection error
+        print("\rCannot connect to Google TTS!")
+        raise
 
 def download_moves():
     """Download all mp3 files for basic moves."""
@@ -139,17 +161,30 @@ def download_moves():
     sys.stdout.write(display_last); sys.stdout.flush()
     if not os.path.isdir('audio') and not os.path.exists('audio'):
         os.mkdir('audio')
-    for side in SIDES:
-        for limb in LIMBS:
-            for color in COLORS:
-                if 'spinners choice' == color:
-                    for _color in _COLORS:
-                        str_move = ' '.join([side,limb,_color,'and',color])
+    try:
+        for side in SIDES:
+            for limb in LIMBS:
+                for color in COLORS:
+                    if 'spinners choice' == color:
+                        for _color in _COLORS:
+                            str_move = ' '.join([side,limb,_color,'and',color])
+                            file_name = 'audio/{}.mp3'.format(str_move.replace(' ','_'))
+                            if not os.path.exists(file_name):
+                                save_sound_file(str_move, file_name)
+                    else:
+                        str_move = ' '.join([side,limb,color])
                         file_name = 'audio/{}.mp3'.format(str_move.replace(' ','_'))
                         if not os.path.exists(file_name):
                             save_sound_file(str_move, file_name)
-                else:
-                    str_move = ' '.join([side,limb,color])
+                    current += 1
+                    sys.stdout.write('\b'*len(display_last)) #backspace over last display
+                    display_last = display.format(int((current*100)/total))
+                    sys.stdout.write(display_last)
+                    sys.stdout.flush()
+        if CHOICE:
+            for index in range(CHOICES.len):
+                str_move = CHOICES.get(index)
+                if '{}' not in str_move: # skip downloading formatted types
                     file_name = 'audio/{}.mp3'.format(str_move.replace(' ','_'))
                     if not os.path.exists(file_name):
                         save_sound_file(str_move, file_name)
@@ -158,19 +193,9 @@ def download_moves():
                 display_last = display.format(int((current*100)/total))
                 sys.stdout.write(display_last)
                 sys.stdout.flush()
-    if CHOICE:
-        for index in range(CHOICES.len):
-            str_move = CHOICES.get(index)
-            if '{}' not in str_move: # skip downloading formatted types
-                file_name = 'audio/{}.mp3'.format(str_move.replace(' ','_'))
-                if not os.path.exists(file_name):
-                    save_sound_file(str_move, file_name)
-            current += 1
-            sys.stdout.write('\b'*len(display_last)) #backspace over last display
-            display_last = display.format(int((current*100)/total))
-            sys.stdout.write(display_last)
-            sys.stdout.flush()
-
+    except KeyboardInterrupt:
+        safe_delete(file_name)
+        raise
     sys.stdout.write('\r')
     sys.stdout.write(' '* (len(download_message) + len(display_last)))
     sys.stdout.write('\r')
@@ -323,7 +348,7 @@ def at_exit():
         mixer.quit()
         for file in LAST:
             try:
-                os.remove(file)
+                safe_delete(file)
             except:
                 continue # if remove fails move on to next`
 
@@ -361,7 +386,7 @@ def main():
         except KeyboardInterrupt:
             if WIN and LAST is not None:
                 mixer.quit()
-                os.remove(LAST)
+                safe_delete(LAST)
             print("\nGame lasted {} rounds!".format(ROUNDS))
             exit(0)
     return 0
@@ -389,4 +414,7 @@ if __name__ == '__main__':
             print("Cannot import audio utility.  Continuing without audio.")
             print("To install, try: pip{} install --upgrade gTTS pygame".format( \
             '3' if sys.version_info > (3,0) else '2'))
+        except: # probably just a download error
+            AUDIO = False
+            print("Audio Disabled!") #
     main()
