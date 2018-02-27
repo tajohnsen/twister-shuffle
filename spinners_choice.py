@@ -24,7 +24,7 @@
 import random
 
 
-class Choice():
+class Choice(object):
     def __init__(self):
         self.commands = []
         self.len = 0  # initialize with 0 elements
